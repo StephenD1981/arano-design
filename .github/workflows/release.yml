@@ -1,0 +1,156 @@
+name: Release
+
+# The ONLY way @arano/design reaches npm. Nobody publishes from a laptop (package.json prepublishOnly refuses
+# outside GitHub Actions).
+#
+#   version  While changesets are pending on main, open or update the "Release: version packages" pull request.
+#            Merging that pull request is the release decision.
+#   decide   Ungated. Once nothing is pending, is the version in package.json missing from npm? A push that
+#            publishes nothing stops here and never asks for an approval.
+#   build    No secrets, no OIDC: install, every check, `npm pack`, and the tarball as an artefact.
+#   publish  Environment npm-publish (Stephen approves). OIDC only. No checkout and no install, so no
+#            dependency code runs where the publish credential exists: it publishes the built tarball.
+#   tag      Tags the published commit, idempotently, so a rerun is safe.
+#
+# Every job runs on Node 24: @changesets/cli 3 needs Node 22 or later, and trusted publishing needs npm 11.5.1 and
+# Node 22.14 or later. The package itself supports Node 20 and later, which ci.yml tests.
+#
+# Authentication (README, "Publishing"): trusted publishing (OIDC) for every release after the first. npm cannot
+# attach a trusted publisher to a package that does not exist yet, so the FIRST publish uses a one-day granular
+# token in the NPM_TOKEN secret of the npm-publish environment, revoked straight after.
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Version pull request
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      has-changesets: ${{ steps.changesets.outputs.has-changesets }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - id: changesets
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        with:
+          version-script: npm run version-packages
+          pr-title: 'Release: version packages'
+          commit-message: 'chore(release): version packages'
+
+  decide:
+    name: Is a publish needed
+    needs: version
+    if: needs.version.outputs.has-changesets == 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      publish: ${{ steps.check.outputs.publish }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - id: check
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          if npm view "@arano/design@${VERSION}" version > /dev/null 2>&1; then
+            echo "@arano/design@${VERSION} is already on npm; nothing to publish."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: Build and check the release tarball
+    needs: decide
+    if: needs.decide.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false # never use caching in release builds (npm's guidance)
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run test:fixtures
+      - run: npm pack
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: package
+          path: arano-design-${{ needs.decide.outputs.version }}.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish to npm
+    needs: [decide, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: npm-publish
+    permissions:
+      id-token: write # OIDC: trusted publishing and provenance. Nothing else.
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Require npm 11.5.1 or later (trusted publishing)
+        run: |
+          node -e "const [a,b,c]=process.argv[1].split('.').map(Number); if (a<11||(a===11&&(b<5||(b===5&&c<1)))) { console.error('npm '+process.argv[1]+' is older than 11.5.1'); process.exit(1) }" "$(npm --version)"
+      - name: Publish the built tarball with provenance
+        env:
+          # Bootstrap for 1.0.0 only. Delete this line in the follow-up pull request (README, Publishing, step 8).
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish "./arano-design-${{ needs.decide.outputs.version }}.tgz" --provenance --access public
+
+  tag:
+    name: Tag the release
+    needs: [decide, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Tag v${{ needs.decide.outputs.version }} unless it exists
+        env:
+          TAG: v${{ needs.decide.outputs.version }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" > /dev/null; then
+            echo "${TAG} already exists; nothing to do."
+          else
+            git tag "${TAG}" "${GITHUB_SHA}"
+            git push origin "refs/tags/${TAG}"
+          fi

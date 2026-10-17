@@ -1,0 +1,52 @@
+.dark {
+  /* ARANO Signal Cyan identity. Ratios below are measured to WCAG 2.1, not quoted. */
+  --background: 210 22% 3.5%;      /* ARANO Black  #07090B */
+  --foreground: 200 15% 92%;       /* Cloud        #E8ECEE  16.78:1 on black */
+
+  --muted: 207 22% 8%;             /* Graphite     #101519 */
+  --muted-foreground: 203 9% 58%;  /* Steel Text   #8A969E   6.59 / 6.07 - AA body */
+  --muted-foreground-light: 203 10% 66%;
+  --muted-foreground-dark: 203 8% 51%;
+
+  /* Graphite is only 1.09:1 against ARANO Black, so card borders are load-bearing. */
+  --card: 207 22% 8%;
+  --card-foreground: 200 15% 92%;
+
+  --popover: 207 22% 8%;
+  --popover-foreground: 200 15% 92%;
+
+  /* Signal Cyan. 12.53:1 on black. Takes BLACK ink, not white - the inversion. */
+  --primary: 185.5 72% 67.5%;      /* #70DDE8 */
+  --primary-foreground: 210 22% 3.5%;
+  --primary-dark: 185.5 72% 57%;
+  --primary-light: 185.5 72% 78%;
+
+  /* Light-context cyan: Signal Cyan is 1.59:1 on white and unusable there.
+     #157984 measures 5.12:1 on white. For email, print and PDF. */
+  --primary-ink: 187 73% 30%;
+
+  --secondary: 207 22% 8%;
+  --secondary-foreground: 200 15% 92%;
+
+  --accent: 185.5 72% 67.5%;
+  --accent-foreground: 210 22% 3.5%;
+
+  --border: 0 0% 100% / 0.08;
+  --border-light: 0 0% 100% / 0.15;
+  --border-dark: 0 0% 100% / 0.04;
+  --border-strong: 203 8% 44%;     /* Steel #68737A - borders and icons ONLY,
+                                      it fails AA as body text on both grounds */
+
+  --ring: 185.5 72% 67.5%;
+
+  --success: 145 63% 49%;          /* Validated     #2ECC71  8.74 on graphite */
+  --warning: 44 100% 48%;          /* Warning       #F5B400  9.98 */
+  --error: 359 100% 65%;           /* Degraded      #FF4D4F  5.62 */
+  --investigating: 258 90% 70%;    /* Investigating #976EF7  5.15 - was #976EF7 at 4.34, failed */
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.4), 0 8px 10px -6px rgb(0 0 0 / 0.3);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.6);
+}

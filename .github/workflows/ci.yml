@@ -1,0 +1,38 @@
+name: CI
+
+# Every push and pull request: lint, types, unit tests, build, then the built package against real
+# Tailwind 3.4 and Tailwind 4 consumers, its exports map and its tarball. Node 20, 22 and 24 because the
+# consumers run on all three (arano-ran CI on 20 and 22, the website on 24). On Node 20, npm ci prints EBADENGINE
+# warnings for @changesets/cli 3, which needs Node 22: it is release tooling only, and release.yml runs on 24.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Built package against Tailwind 3.4 and 4, exports map and tarball
+        run: npm run test:fixtures

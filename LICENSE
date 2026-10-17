@@ -1,0 +1,14 @@
+Copyright (c) 2026 ARANO. All rights reserved.
+
+The source code, generated files, design tokens, the ARANO name, the ARANO mark and the other brand assets in this
+package are the property of ARANO. No licence to use, copy, modify or distribute them is granted except by written
+agreement with ARANO. Publication on a public registry does not grant one.
+
+The fonts are not ARANO's. They are bundled unmodified under their own licence:
+
+  fonts/geist/          Geist, Copyright 2024 The Geist Project Authors,
+                        SIL Open Font License, Version 1.1 (fonts/geist/OFL.txt)
+  fonts/ibm-plex-mono/  IBM Plex Mono, Copyright 2017 IBM Corp.,
+                        SIL Open Font License, Version 1.1 (fonts/ibm-plex-mono/OFL.txt)
+
+Each family's OFL.txt governs that family's files, whatever this notice says.
