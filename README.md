@@ -111,8 +111,11 @@ stands alone.
 ### Fonts
 
 The package ships Geist (the variable file, as Google Fonts serves it) and IBM Plex Mono 400, 500 and 600, in the
-five Google subsets (cyrillic-ext, cyrillic, vietnamese, latin-ext, latin). Nothing is fetched from Google at build
-or run time, which also keeps air-gapped builds working.
+five Google subsets (cyrillic-ext, cyrillic, vietnamese, latin-ext, latin). The files are the files Google Fonts
+serves for Geist and IBM Plex Mono, as served on 2026-10-17 (captured byte-for-byte from a next/font/google build),
+unmodified; SIL OFL 1.1. Their source is the committed `font-files/` directory, whose README lists each file's
+SHA-256; the build copies them into `fonts/`. Nothing is fetched from Google at build or run time, which also keeps
+air-gapped builds working.
 
 - `fonts/fonts.css` declares every face, a fallback face per family (`Geist Fallback`, `IBM Plex Mono Fallback`,
   with Google's precalculated metrics so text does not jump while the font loads) and the role variables
@@ -123,17 +126,37 @@ or run time, which also keeps air-gapped builds working.
 **Next.js (next/font/local).** next/font accepts only literal arguments, so the latin faces are written out in
 the root layout, with paths relative to it, and the unicode range is pasted in as a string (copy it from
 `UNICODE_RANGES.latin`). `declarations` keeps the family name `Geist`. The fallback face comes from `next.css` with
-Google's metrics, so next/font's own fallback calculation is switched off:
+Google's metrics, so next/font's own fallback calculation is switched off. Geist carries two roles, so it takes TWO
+`localFont` calls, one per variable (`--font-display` and `--font-sans`); IBM Plex Mono takes a third for
+`--font-mono`:
 
 ```tsx
 import localFont from 'next/font/local'
 import '@arano/design/fonts/next.css'
 
-const geistSans = localFont({
+const geistDisplay = localFont({
   src: [
     { path: '../node_modules/@arano/design/fonts/geist/geist-latin-wght-normal.woff2', weight: '300' },
     { path: '../node_modules/@arano/design/fonts/geist/geist-latin-wght-normal.woff2', weight: '400' },
     // the same file again for 500, 600 and 700: Geist is one variable file per subset
+  ],
+  variable: '--font-display',
+  display: 'swap',
+  style: 'normal',
+  adjustFontFallback: false,
+  fallback: ["'Geist Fallback'"],
+  declarations: [
+    { prop: 'font-family', value: 'Geist' },
+    { prop: 'unicode-range', value: 'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD' },
+  ],
+})
+
+// The second Geist call: identical except for the variable.
+const geistSans = localFont({
+  src: [
+    { path: '../node_modules/@arano/design/fonts/geist/geist-latin-wght-normal.woff2', weight: '300' },
+    { path: '../node_modules/@arano/design/fonts/geist/geist-latin-wght-normal.woff2', weight: '400' },
+    // 500, 600 and 700 as above
   ],
   variable: '--font-sans',
   display: 'swap',
@@ -145,12 +168,22 @@ const geistSans = localFont({
     { prop: 'unicode-range', value: 'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD' },
   ],
 })
+
+// IBM Plex Mono: the same shape with ibm-plex-mono-latin-{400,500,600}-normal.woff2, variable '--font-mono',
+// fallback "'IBM Plex Mono Fallback'" and font-family 'IBM Plex Mono'.
+
+// <html className={`dark ${geistDisplay.variable} ${geistSans.variable} ${plexMono.variable}`}>
 ```
 
-The `path` is relative to the file that calls `localFont`, so it depends on where `node_modules` is. In an npm
-workspaces repository the package is hoisted to the ROOT `node_modules`: from `site/app/layout.tsx` the path is
-`../../node_modules/@arano/design/fonts/...`. This is the recipe arano-ran's adoption measures against the
-next/font/google output it replaces; arano-ran's `app/layout.tsx` is the worked example once that lands.
+The `path` is relative to the file that calls `localFont`, so it depends on where `node_modules`
+is. In an npm workspaces repository the package is hoisted to the ROOT `node_modules`: from `site/app/layout.tsx`
+the path is `../../node_modules/@arano/design/fonts/...`.
+
+The recipe does NOT reproduce next/font/google's CSS exactly. Against the next/font/google build it replaces, it
+differs in the ways ruling R18 allows (see "Upgrading" below): the `.__className_<hash>` and `.__variable_<hash>`
+class hashes, `font-style:normal` on the `.__className_` rules, the order of the `@font-face` rules, and which CSS
+file (chunk) the font rules land in. The font files are the same bytes Google serves. Screenshots before and after
+are the proof that the page renders the same; the gate only proves that nothing else in the CSS changed.
 
 **Vite.** `import '@arano/design/fonts/fonts.css'` once, at the entry. Vite resolves the `url()`s and bundles the
 files.
@@ -174,8 +207,9 @@ Declare the module type once (`declare module '*.woff2' { const url: string; exp
 
 **Attribution.** Geist: Copyright 2024 The Geist Project Authors (https://github.com/vercel/geist-font). IBM Plex
 Mono: Copyright 2017 IBM Corp. Both under the SIL Open Font Licence 1.1, whose text ships beside the files
-(`fonts/geist/OFL.txt`, `fonts/ibm-plex-mono/OFL.txt`). The files are copied unmodified from
-`@fontsource-variable/geist` 5.3.0 and `@fontsource/ibm-plex-mono` 5.3.0.
+(`fonts/geist/OFL.txt`, `fonts/ibm-plex-mono/OFL.txt`). The font files are the files Google Fonts serves for Geist
+and IBM Plex Mono, as served on 2026-10-17 (captured byte-for-byte from a next/font/google build), unmodified; SIL
+OFL 1.1. (Until 1.1.0 they came from fontsource 5.3.0, whose files are not Google's bytes.)
 
 ### Severity
 
@@ -189,12 +223,30 @@ migration, as a total map: `cleared` reads as healthy, `degraded` as major (neve
 - **A token value change is a minor release.** That includes a changed colour, font file or brand SVG.
 - **A renamed or removed token, entry or export is a major release.**
 - **A new token is a minor release.**
-- **Every consumer upgrades by pull request, with the CSS-diff gate:** build before and after, run
-  `tools/css-parity.mjs` over the two CSS outputs, and review every difference it reports. It fails closed: an empty
-  side, the same directory twice, a different file count, any rule added, removed, changed or moved (within a file
-  or between files), and any light/dark pair whose order changed or cannot be established. The only tolerated
-  difference is an `@font-face` src URL. The website adds its screenshot check. A consumer pins the version in its
-  lockfile; nothing updates silently.
+- **Every consumer upgrades by pull request, with the CSS-diff gate:** build before and after, copy the two CSS
+  outputs (for Next.js, `.next/static/css`), then run
+
+  ```bash
+  node tools/css-parity.mjs <postcss-module-path> <beforeDir> <afterDir> <outDir> [--allow-removed <selector>]...
+  ```
+
+  and review `<outDir>/gate.txt`. It fails closed: an empty side, the same directory twice, any rule added,
+  removed, changed or moved (within a file or between files), a different file count beyond R18 d below, and any
+  light/dark pair whose order changed or cannot be established. An `@font-face` src URL is always tolerated. The
+  website adds its screenshot check. A consumer pins the version in its lockfile; nothing updates silently.
+- **R18 allowances (2026-10-18), for the move from next/font/google to next/font/local.** These, and only these,
+  are tolerated, and each one found is listed in `gate.txt` as `ALLOWED (R18 ...)`:
+  - a. a renamed next/font class hash: a rule whose whole selector is `.__className_<hex>` or `.__variable_<hex>`
+    is compared with the hash replaced by a placeholder, so its declarations must otherwise match;
+  - b. a missing or added `font-style:normal` on a `.__className_<hex>` rule (on no other rule);
+  - c. the order of `@font-face` rules (as a multiset they must still match);
+  - d. `@font-face` and next/font class rules moving between CSS files, including a change in the number of files,
+    provided every file's other rules are still identical, in order, to one file on the other side;
+  - e. the removal of a rule named with `--allow-removed <selector>`: one flag per rule, the exact selector (no
+    wildcard, no list), which must be exactly one rule before and absent after. The website uses it for
+    `--allow-removed '.text-gray-500'`, a utility that only a comment in its old Tailwind config generated.
+
+  Anything else, including any other selector, declaration or custom property, still fails.
 
 ## Releasing
 
@@ -287,7 +339,7 @@ npm ci
 npm run lint
 npm run typecheck
 npm test           # unit tests against the sources
-npm run build      # tsup, then dist/tokens.css and fonts/
+npm run build      # tsup, then dist/tokens.css and fonts/ (from font-files/)
 npm run test:fixtures  # the built package: Tailwind 3.4 (CJS and ESM configs) and 4, exports map, tarball
 ```
 

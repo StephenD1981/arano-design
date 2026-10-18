@@ -1,17 +1,15 @@
 import { execFileSync, spawnSync } from 'node:child_process'
 import { readFileSync, readdirSync } from 'node:fs'
-import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /**
  * The BUILT package as a consumer meets it: every export resolves under Node's own resolver in both module
- * systems, the generated CSS matches its source, the fonts are the pinned fontsource files unmodified, and the
- * tarball holds what it should and nothing else.
+ * systems, the generated CSS matches its source, the fonts are the committed font-files/ (Google's bytes)
+ * unmodified, and the tarball holds what it should and nothing else.
  */
 const ROOT = join(__dirname, '..')
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
-const require = createRequire(import.meta.url)
 const node = (args: string[]) => execFileSync(process.execPath, args, { cwd: ROOT, encoding: 'utf8' }).trim()
 
 const ENTRIES: Record<string, string> = {
@@ -74,16 +72,15 @@ describe('generated artefacts', () => {
     expect(readFileSync(join(ROOT, 'dist/tokens.css'), 'utf8').trim()).toBe(generated)
   })
 
-  it('ships exactly the 20 declared font files, each byte-identical to its pinned @fontsource source', () => {
-    const SOURCES: Record<string, string> = { geist: '@fontsource-variable/geist', 'ibm-plex-mono': '@fontsource/ibm-plex-mono' }
+  it('ships exactly the 20 declared font files, each byte-identical to its committed font-files/ source', () => {
     let count = 0
-    for (const dir of Object.keys(SOURCES)) {
-      const src = join(dirname(require.resolve(`${SOURCES[dir]}/package.json`)), 'files')
+    for (const dir of ['geist', 'ibm-plex-mono']) {
+      const src = join(ROOT, 'font-files', dir)
       for (const file of readdirSync(join(ROOT, 'fonts', dir)).filter((f) => f.endsWith('.woff2'))) {
         expect(readFileSync(join(ROOT, 'fonts', dir, file)).equals(readFileSync(join(src, file))), file).toBe(true)
         count++
       }
-      expect(readFileSync(join(ROOT, 'fonts', dir, 'OFL.txt'), 'utf8')).toContain('SIL OPEN FONT LICENSE Version 1.1')
+      expect(readFileSync(join(ROOT, 'fonts', dir, 'OFL.txt')).equals(readFileSync(join(src, 'OFL.txt'))), `${dir}/OFL.txt`).toBe(true)
     }
     expect(count).toBe(20)
   })
@@ -101,6 +98,6 @@ describe('tarball', () => {
   })
 
   it('leaves out sources, tests, fixtures, CI and tooling', () => {
-    expect(files.filter((f) => /^(src|test|fixtures|scripts|tools|\.github|\.changeset)\//.test(f))).toEqual([])
+    expect(files.filter((f) => /^(src|test|fixtures|scripts|tools|font-files|\.github|\.changeset)\//.test(f))).toEqual([])
   })
 })
