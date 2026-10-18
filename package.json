@@ -1,6 +1,6 @@
 {
   "name": "@arano/design",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "The ARANO look and feel: colour tokens, the dark theme, a Tailwind preset, fonts and the brand mark, shared by every ARANO product and the website.",
   "license": "UNLICENSED",
   "author": "ARANO",
