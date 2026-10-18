@@ -118,5 +118,8 @@
     "typescript": "5.9.3",
     "typescript-eslint": "8.71.2",
     "vitest": "4.1.12"
+  },
+  "overrides": {
+    "postcss-selector-parser": "7.1.6"
   }
 }
