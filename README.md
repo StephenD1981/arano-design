@@ -111,8 +111,11 @@ stands alone.
 ### Fonts
 
 The package ships Geist (the variable file, as Google Fonts serves it) and IBM Plex Mono 400, 500 and 600, in the
-five Google subsets (cyrillic-ext, cyrillic, vietnamese, latin-ext, latin). Nothing is fetched from Google at build
-or run time, which also keeps air-gapped builds working.
+five Google subsets (cyrillic-ext, cyrillic, vietnamese, latin-ext, latin). The files are the files Google Fonts
+serves for Geist and IBM Plex Mono, as served on 2026-10-17 (captured byte-for-byte from a next/font/google build),
+unmodified; SIL OFL 1.1. Their source is the committed `font-files/` directory, whose README lists each file's
+SHA-256; the build copies them into `fonts/`. Nothing is fetched from Google at build or run time, which also keeps
+air-gapped builds working.
 
 - `fonts/fonts.css` declares every face, a fallback face per family (`Geist Fallback`, `IBM Plex Mono Fallback`,
   with Google's precalculated metrics so text does not jump while the font loads) and the role variables
@@ -174,8 +177,9 @@ Declare the module type once (`declare module '*.woff2' { const url: string; exp
 
 **Attribution.** Geist: Copyright 2024 The Geist Project Authors (https://github.com/vercel/geist-font). IBM Plex
 Mono: Copyright 2017 IBM Corp. Both under the SIL Open Font Licence 1.1, whose text ships beside the files
-(`fonts/geist/OFL.txt`, `fonts/ibm-plex-mono/OFL.txt`). The files are copied unmodified from
-`@fontsource-variable/geist` 5.3.0 and `@fontsource/ibm-plex-mono` 5.3.0.
+(`fonts/geist/OFL.txt`, `fonts/ibm-plex-mono/OFL.txt`). The font files are the files Google Fonts serves for Geist
+and IBM Plex Mono, as served on 2026-10-17 (captured byte-for-byte from a next/font/google build), unmodified; SIL
+OFL 1.1. (Until 1.1.0 they came from fontsource 5.3.0, whose files are not Google's bytes.)
 
 ### Severity
 
@@ -287,7 +291,7 @@ npm ci
 npm run lint
 npm run typecheck
 npm test           # unit tests against the sources
-npm run build      # tsup, then dist/tokens.css and fonts/
+npm run build      # tsup, then dist/tokens.css and fonts/ (from font-files/)
 npm run test:fixtures  # the built package: Tailwind 3.4 (CJS and ESM configs) and 4, exports map, tarball
 ```
 

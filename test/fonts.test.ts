@@ -1,6 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
+import { createHash } from 'node:crypto'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import postcss from 'postcss'
 import { describe, expect, it } from 'vitest'
 import { FONT_FAMILIES, FONT_ROLES, SUBSETS, UNICODE_RANGES, fontFaceCss, fontFaces } from '../src/fonts'
@@ -11,7 +11,6 @@ import { FONT_FAMILIES, FONT_ROLES, SUBSETS, UNICODE_RANGES, fontFaceCss, fontFa
  * unicode ranges, one Geist file per subset across all weights, and the same fallback metrics. Only the file URLs
  * may differ.
  */
-const require = createRequire(import.meta.url)
 const GOOGLE = postcss.parse(readFileSync(join(__dirname, 'fixtures/arano-ran-next-font-google.css'), 'utf8'))
 
 const unquote = (v: string) => v.replace(/["']/g, '').trim()
@@ -79,29 +78,54 @@ describe('fonts against what next/font/google served arano-ran', () => {
   })
 })
 
-describe('font files', () => {
-  const SOURCES: Record<string, string> = { geist: '@fontsource-variable/geist', 'ibm-plex-mono': '@fontsource/ibm-plex-mono' }
-  const pkgDir = (dir: string) => dirname(require.resolve(`${SOURCES[dir]}/package.json`))
+/**
+ * SHA-256 of every shipped font file: the bytes Google Fonts served on 2026-10-17 (R17; provenance in
+ * font-files/README.md). Changing a file is a minor release and must change this table in the same pull request.
+ */
+const FONT_SHA256: Record<string, string> = {
+  'geist/geist-cyrillic-ext-wght-normal.woff2': 'b7a545bbb08256bd809f11cfe66d88da3e22d169ea4407737b1ef0ec1ed3d791',
+  'geist/geist-cyrillic-wght-normal.woff2': '6129fc8571c3e0cb0a4c41f5160c974a843b055009dc4ad8858bd808e18a2d86',
+  'geist/geist-vietnamese-wght-normal.woff2': 'f689f638f29fff460a2d5749edb5d5c38d7bef0389f32032d871f23fc6ebb008',
+  'geist/geist-latin-ext-wght-normal.woff2': '58a6b173d5ca1dec92166ea3c6cb1a84a4144556d10928ac14e8e6b40e4787bd',
+  'geist/geist-latin-wght-normal.woff2': '9b6f5ff45b278c744b5f379a2c4ecbaf858a842b8eaf82ac8d21b699ca16c608',
+  'ibm-plex-mono/ibm-plex-mono-cyrillic-ext-400-normal.woff2': 'c6f09ee0e0a24b7c85ecb2a601eb99332f65b1f6b37c31e0bbe73fb307625eca',
+  'ibm-plex-mono/ibm-plex-mono-cyrillic-400-normal.woff2': '7b59d6bf7f8b8408ac28f27d01dca9a890abeae77045d343b1d8ccb089a92e54',
+  'ibm-plex-mono/ibm-plex-mono-vietnamese-400-normal.woff2': '0a8b854cc18641bd1b8222afa7ec82a75e59bc6501f777744ec87db1b6cd7a2c',
+  'ibm-plex-mono/ibm-plex-mono-latin-ext-400-normal.woff2': 'f1050dc5317b43434c0aeda599d4624c774ffc162e87a8cf204b949b6a85816d',
+  'ibm-plex-mono/ibm-plex-mono-latin-400-normal.woff2': 'c36f509c0a8f9f85f29cb44bc8701d8a9e0b14c499e77a884f789ead7093a7ac',
+  'ibm-plex-mono/ibm-plex-mono-cyrillic-ext-500-normal.woff2': '311098be73eac339128f0b5a6e33d72645b6f87488541fdf467c402152d297fd',
+  'ibm-plex-mono/ibm-plex-mono-cyrillic-500-normal.woff2': 'd524dc8ff6dbf7ed69772f3b2ff4affaf5a89b5762b270e36c3f21da0d4e39f5',
+  'ibm-plex-mono/ibm-plex-mono-vietnamese-500-normal.woff2': 'b2529fba93fd07a50ffb8fc3d103eb04b0c298d4f6564d2833c44fde286de7e4',
+  'ibm-plex-mono/ibm-plex-mono-latin-ext-500-normal.woff2': '77f03e26f981c582bdba3a7abed4baa2d3149211c01366bb3ab3ba7622ec4ae5',
+  'ibm-plex-mono/ibm-plex-mono-latin-500-normal.woff2': 'a76f53ca6612e7b3828eec2311098675b7f9849ae4169a8bcef6302aec02a6c0',
+  'ibm-plex-mono/ibm-plex-mono-cyrillic-ext-600-normal.woff2': 'f746246b6b0b641f99d9e26e0bf4e42197bde692126857857f0195a94362d52a',
+  'ibm-plex-mono/ibm-plex-mono-cyrillic-600-normal.woff2': 'b814a03d7e57b0626a906f76911b9361d173a1aabc5544c40f72d6a35a1e4940',
+  'ibm-plex-mono/ibm-plex-mono-vietnamese-600-normal.woff2': '69744cabbccc9faf77516ce9b744361e1e6be7f8081400006035a153797d2965',
+  'ibm-plex-mono/ibm-plex-mono-latin-ext-600-normal.woff2': '1b6b18fd0fd240bc6d5850f4df621484722d4b5d3650ebdd1e3a8bbd81c75854',
+  'ibm-plex-mono/ibm-plex-mono-latin-600-normal.woff2': 'ad4580d8cb4b5f627c2d18457656732f7f7b070f7837fbc380e08054157e6f6c',
+}
 
-  it('every declared face exists in its pinned @fontsource package', () => {
-    for (const face of fontFaces()) {
-      const [dir, file] = face.path.split('/') as [string, string]
-      expect(existsSync(join(pkgDir(dir), 'files', file)), face.path).toBe(true)
-    }
+describe('font files', () => {
+  const SOURCE = join(__dirname, '..', 'font-files')
+  const sha256 = (path: string) => createHash('sha256').update(readFileSync(join(SOURCE, path))).digest('hex')
+
+  it('holds exactly the 20 declared faces, each file once, and nothing else', () => {
+    const declared = [...new Set(fontFaces().map((f) => f.path))].sort()
+    const present = Object.values(FONT_FAMILIES)
+      .flatMap((f) => readdirSync(join(SOURCE, f.dir)).filter((n) => n.endsWith('.woff2')).map((n) => `${f.dir}/${n}`))
+      .sort()
+    expect(declared).toHaveLength(20)
+    expect(present).toEqual(declared)
+    expect(Object.keys(FONT_SHA256).sort()).toEqual(declared)
   })
 
-  it("differs from fontsource's unicode.json only where Google has moved on (latin-ext to U+20C4)", () => {
-    for (const dir of Object.keys(SOURCES)) {
-      const theirs = JSON.parse(readFileSync(join(pkgDir(dir), 'unicode.json'), 'utf8')) as Record<string, string>
-      const changed = SUBSETS.filter((s) => intervals(theirs[s]!) !== intervals(UNICODE_RANGES[s]))
-      expect(changed, dir).toEqual(['latin-ext'])
-      expect(theirs['latin-ext']!.replace('U+20AD-20C0', 'U+20AD-20C4')).toBe(UNICODE_RANGES['latin-ext'])
-    }
+  it.each(Object.entries(FONT_SHA256))('%s is the pinned Google file', (path, hash) => {
+    expect(sha256(path)).toBe(hash)
   })
 
   it('ships each family under the SIL Open Font Licence', () => {
-    for (const dir of Object.keys(SOURCES)) {
-      expect(readFileSync(join(pkgDir(dir), 'LICENSE'), 'utf8')).toContain('SIL OPEN FONT LICENSE Version 1.1')
+    for (const f of Object.values(FONT_FAMILIES)) {
+      expect(readFileSync(join(SOURCE, f.dir, 'OFL.txt'), 'utf8')).toContain('SIL OPEN FONT LICENSE Version 1.1')
     }
   })
 })

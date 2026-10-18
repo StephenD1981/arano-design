@@ -1,14 +1,14 @@
 /**
  * ARANO typefaces: the role map, the shipped files, and the @font-face rules for them.
  *
- * The files under fonts/ are copied unmodified from @fontsource-variable/geist and @fontsource/ibm-plex-mono
- * (SIL Open Font Licence 1.1; each family's licence text sits beside its files). No consumer fetches from Google
- * at build or run time.
+ * The files under fonts/ are the files Google Fonts serves for Geist and IBM Plex Mono, as served on 2026-10-17
+ * (captured byte-for-byte from a next/font/google build), unmodified; SIL Open Font Licence 1.1, with each family's
+ * licence text beside its files. The build copies them from the committed font-files/ (provenance and SHA-256 in
+ * font-files/README.md). No consumer fetches from Google at build or run time.
  *
  * The descriptors reproduce what next/font/google emitted for arano-ran on 2026-10-17, measured from its compiled
  * CSS (test/fixtures/arano-ran-next-font-google.css): the same five unicode-range subsets, the variable Geist file
- * declared once per weight, and Google's precalculated fallback metrics. The one place this departs from
- * fontsource's own unicode.json is latin-ext, which Google now ends at U+20C4 where fontsource says U+20C0.
+ * declared once per weight, and Google's precalculated fallback metrics.
  */
 
 /** Google's subset order, which is the order the faces are declared in. */
