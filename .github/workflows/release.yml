@@ -15,9 +15,8 @@ name: Release
 # Every job runs on Node 24: @changesets/cli 3 needs Node 22 or later, and trusted publishing needs npm 11.5.1 and
 # Node 22.14 or later. The package itself supports Node 20 and later, which ci.yml tests.
 #
-# Authentication (README, "Publishing"): trusted publishing (OIDC) for every release after the first. npm cannot
-# attach a trusted publisher to a package that does not exist yet, so the FIRST publish uses a one-day granular
-# token in the NPM_TOKEN secret of the npm-publish environment, revoked straight after.
+# Authentication (README, "Publishing"): trusted publishing (OIDC) only. 1.0.0 was published with a one-day
+# bootstrap token, revoked afterwards; no token exists any more, so a publish without a trusted publisher fails.
 on:
   push:
     branches: [main]
@@ -130,9 +129,6 @@ jobs:
         run: |
           node -e "const [a,b,c]=process.argv[1].split('.').map(Number); if (a<11||(a===11&&(b<5||(b===5&&c<1)))) { console.error('npm '+process.argv[1]+' is older than 11.5.1'); process.exit(1) }" "$(npm --version)"
       - name: Publish the built tarball with provenance
-        env:
-          # Bootstrap for 1.0.0 only. Delete this line in the follow-up pull request (README, Publishing, step 8).
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish "./arano-design-${{ needs.decide.outputs.version }}.tgz" --provenance --access public
 
   tag:
