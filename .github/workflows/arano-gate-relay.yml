@@ -1,0 +1,16 @@
+# Reviews cannot trigger pull_request_target, and a pull_request_review workflow runs the
+# pull request's own copy of its YAML. So this relay does nothing at all (no permissions,
+# no secrets, no checkout); its completion triggers the trusted arano-gate workflow_run.
+name: arano-gate review relay
+
+on:
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+
+permissions: {}
+
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Review event; arano-gate re-evaluates from main."

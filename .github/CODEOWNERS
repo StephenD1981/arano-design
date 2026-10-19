@@ -1,0 +1,15 @@
+# Control files: only the CTO approves changes (brief v2.2 Phase 3, WP-4).
+/.github/          @StephenD1981
+/.claude/          @StephenD1981
+/.codex/           @StephenD1981
+/.agents/          @StephenD1981
+/.githooks/        @StephenD1981
+/AGENTS.md         @StephenD1981
+/CLAUDE.md         @StephenD1981
+package.json       @StephenD1981
+package-lock.json  @StephenD1981
+pyproject.toml     @StephenD1981
+requirements*.txt  @StephenD1981
+Dockerfile*        @StephenD1981
+docker-compose*.yml @StephenD1981
+migrations/        @StephenD1981
