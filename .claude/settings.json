@@ -1,0 +1,14 @@
+{
+  "extraKnownMarketplaces": {
+    "arano": {
+      "source": {
+        "source": "github",
+        "repo": "StephenD1981/arano-engineering",
+        "ref": "v0.1.0"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "arano-engineering@arano": true
+  }
+}
