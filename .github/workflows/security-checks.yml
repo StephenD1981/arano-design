@@ -1,0 +1,30 @@
+# Definition-of-done security checks (brief v2.2 Phase 3, WP-4). Runs the pull request's code, so it
+# holds no secrets and has read-only access. The checks themselves live in arano-engineering.
+name: security-checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: StephenD1981/arano-engineering/actions/security-checks@f03f27b0ac70f3fcaa0cc200b3f3163206d4b479
+        with:
+          python-version: "3.11"
+          python-requirements: ""
+          python-pinned: "false"
+          python-licence-requirements: ""
+          node-dirs: "."
+          semgrep-configs: "p/typescript p/javascript"
+          run-audits: "true"
