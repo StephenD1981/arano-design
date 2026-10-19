@@ -85,25 +85,50 @@ jobs:
           echo "Head is in ${{ steps.pr.outputs.head_repo }}; only same-repository branches can be gated." >&2
           exit 1
 
+      # This repository is public, and a public repository cannot use actions from the private
+      # arano-engineering repository. So the gate code is checked out at its release tag with a
+      # read-only App token (also from the main-only environment) and run by the same isolated launcher.
+      - name: Factory App token (read arano-engineering)
+        id: eng
+        uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+        with:
+          app-id: ${{ secrets.ARANO_APP_ID }}
+          private-key: ${{ secrets.ARANO_APP_PRIVATE_KEY }}
+          repositories: arano-engineering
+          permission-contents: read
+
+      - name: Check out arano-engineering at the release tag
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: StephenD1981/arano-engineering
+          ref: v0.2.0
+          path: engineering
+          token: ${{ steps.eng.outputs.token }}
+          persist-credentials: false
+
       - name: Check out the pull request head (data only; nothing from it is executed)
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ steps.pr.outputs.head }}
+          path: pr
           fetch-depth: 0
           persist-credentials: false
 
       - name: Record the checked-out commit
         id: co
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        run: echo "sha=$(git -C pr rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: arano-gate
         id: gate
-        uses: StephenD1981/arano-engineering/actions/arano-gate@v0.2.0
-        with:
-          pr-number: ${{ steps.pr.outputs.number }}
-          checked-out-sha: ${{ steps.co.outputs.sha }}
-          factory-app-login: arano-factory[bot]
-          app-token: ${{ steps.app.outputs.token }}
+        working-directory: pr
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ARANO_APP_TOKEN: ${{ steps.app.outputs.token }}
+          ARANO_PR: ${{ steps.pr.outputs.number }}
+          ARANO_CHECKED_OUT_SHA: ${{ steps.co.outputs.sha }}
+          ARANO_CTO_LOGIN: StephenD1981
+          ARANO_APP_LOGIN: arano-factory[bot]
+        run: python3 -I "$GITHUB_WORKSPACE/engineering/actions/arano-gate/run.py"
 
       # Any failure or cancellation after the pending mark ends as failure, never as the old success.
       # Skipped when the gate step ran to completion: it has already recorded its own verdict.
