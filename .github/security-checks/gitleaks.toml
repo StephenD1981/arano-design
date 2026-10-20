@@ -1,0 +1,4 @@
+# Trusted gitleaks configuration for arano-security-checks: the default rules, with no
+# allow-lists. A repository's own .gitleaks.toml is not read (changing one is High risk anyway).
+[extend]
+useDefault = true

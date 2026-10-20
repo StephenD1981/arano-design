@@ -1,0 +1,144 @@
+# arano-gate (brief v2.2 Phase 3, WP-4). The required check is the "arano-gate" commit
+# status set by the factory App, not this job. Only trusted triggers run here: each of them
+# uses this file as it exists on main, so a pull request cannot change the gate that judges it.
+name: arano-gate
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled, ready_for_review]
+  workflow_run:
+    workflows: [arano-gate review relay]
+    types: [completed]
+  workflow_dispatch:            # the dashboard re-runs the gate after a CTO approval or revocation
+    inputs:
+      pr:
+        description: Pull request number
+        required: true
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+  statuses: read
+
+concurrency:
+  group: arano-gate-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || inputs.pr || github.run_id }}
+  cancel-in-progress: true      # safe: every run sets "pending" before it evaluates
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    environment: arano-gate     # main-only environment holding the App key
+    steps:
+      # First, before anything that can fail: get the App token and mark the head commit
+      # pending, so an earlier success can never survive a failed, cancelled or overtaken run.
+      - name: Factory App token (statuses only, this repository)
+        id: app
+        uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+        with:
+          app-id: ${{ secrets.ARANO_APP_ID }}
+          private-key: ${{ secrets.ARANO_APP_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-statuses: write
+
+      - name: Invalidate the previous result
+        id: hint
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          REPO: ${{ github.repository }}
+          HEAD_HINT: ${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}
+          FROM_INPUT: ${{ inputs.pr }}
+        run: |
+          sha="$HEAD_HINT"
+          if [ -z "$sha" ] && [[ "$FROM_INPUT" =~ ^[0-9]+$ ]]; then
+            sha=$(gh api "repos/$REPO/pulls/$FROM_INPUT" --jq .head.sha)
+          fi
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "No head commit to gate." >&2; exit 1; }
+          gh api "repos/$REPO/statuses/$sha" -f state=pending -f context=arano-gate -f description="Re-evaluating" >/dev/null
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve the pull request (API is authoritative)
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          FROM_PR: ${{ github.event.pull_request.number }}
+          FROM_RUN: ${{ github.event.workflow_run.pull_requests[0].number }}
+          FROM_INPUT: ${{ inputs.pr }}
+        run: |
+          number="${FROM_PR:-${FROM_RUN:-$FROM_INPUT}}"
+          if ! [[ "$number" =~ ^[0-9]+$ ]]; then
+            echo "No pull request for this event (fork review runs carry none); nothing to gate." >&2
+            exit 1
+          fi
+          state=$(gh api "repos/$REPO/pulls/$number" --jq .state)
+          [ "$state" = open ] || { echo "PR #$number is $state"; exit 1; }
+          {
+            echo "number=$number"
+            echo "head=$(gh api "repos/$REPO/pulls/$number" --jq .head.sha)"
+            echo "head_repo=$(gh api "repos/$REPO/pulls/$number" --jq .head.repo.full_name)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Refuse pull requests from other repositories
+        if: steps.pr.outputs.head_repo != github.repository
+        run: |
+          echo "Head is in ${{ steps.pr.outputs.head_repo }}; only same-repository branches can be gated." >&2
+          exit 1
+
+      # This repository is public, and a public repository cannot use actions from the private
+      # arano-engineering repository. So the gate code is checked out at its release tag with a
+      # read-only App token (also from the main-only environment) and run by the same isolated launcher.
+      - name: Factory App token (read arano-engineering)
+        id: eng
+        uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+        with:
+          app-id: ${{ secrets.ARANO_APP_ID }}
+          private-key: ${{ secrets.ARANO_APP_PRIVATE_KEY }}
+          repositories: arano-engineering
+          permission-contents: read
+
+      - name: Check out arano-engineering at the release tag
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: StephenD1981/arano-engineering
+          ref: v0.3.0
+          path: engineering
+          token: ${{ steps.eng.outputs.token }}
+          persist-credentials: false
+
+      - name: Check out the pull request head (data only; nothing from it is executed)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ steps.pr.outputs.head }}
+          path: pr
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Record the checked-out commit
+        id: co
+        run: echo "sha=$(git -C pr rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: arano-gate
+        id: gate
+        working-directory: pr
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ARANO_APP_TOKEN: ${{ steps.app.outputs.token }}
+          ARANO_PR: ${{ steps.pr.outputs.number }}
+          ARANO_CHECKED_OUT_SHA: ${{ steps.co.outputs.sha }}
+          ARANO_CTO_LOGIN: StephenD1981
+          ARANO_APP_LOGIN: arano-factory[bot]
+        run: python3 -I "$GITHUB_WORKSPACE/engineering/actions/arano-gate/run.py"
+
+      # Any failure or cancellation after the pending mark ends as failure, never as the old success.
+      # Skipped when the gate step ran to completion: it has already recorded its own verdict.
+      - name: Record failure
+        if: (failure() || cancelled()) && steps.gate.outcome != 'success' && steps.gate.outcome != 'failure'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ steps.hint.outputs.sha }}
+        run: |
+          [ -n "$SHA" ] && [ -n "$GH_TOKEN" ] || exit 0
+          gh api "repos/$REPO/statuses/$SHA" -f state=failure -f context=arano-gate \
+            -f description="Gate run failed or was cancelled; see the workflow run" >/dev/null || true
